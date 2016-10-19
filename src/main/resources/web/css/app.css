@@ -1,0 +1,44 @@
+button.actualiser {
+    float: right;
+    margin-top: 8px;
+    margin-left: 17px;
+}
+
+#items {
+    margin-top: 70px;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+#items > article {
+    padding: 5px;
+}
+
+article.complete .bar {
+    background-color: #5cb85c;
+}
+
+article.error .bar {
+    background-color: #d9534f;
+}
+
+article .bar {
+    width: 100%;
+    height: 20px;
+    border: 1px solid #e3e0e0;
+    border-radius: 3px;
+}
+
+article h3 {
+    margin-left: 10px;
+}
+
+#items .empty {
+    color: #b6b6b6;
+    text-align: center;
+    font-size: 200%;
+}
+
+h1 > a.label {
+    font-size: 39%;
+}
