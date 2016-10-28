@@ -15,20 +15,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.http.Part;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Redirect;
 import spark.Request;
-import spark.Spark;
 import static spark.Spark.before;
 import static spark.Spark.delete;
+import static spark.Spark.exception;
 import static spark.Spark.get;
 import static spark.Spark.halt;
 import static spark.Spark.port;
@@ -57,6 +59,22 @@ public class SimFilesApp {
 
         return user;
     }
+    
+    private static void clear(Path directoryToDelete) {
+        try {
+            if (Files.exists(directoryToDelete)) {
+                Files.walk(directoryToDelete).
+                        sorted((a, b) -> b.compareTo(a)). // reverse; files before dirs
+                        forEach(p -> {
+                            try {
+                                Files.delete(p);
+                            } catch (IOException e) { /* ... */ }
+                        });
+            }
+        } catch (IOException ex) {
+            LOGGER.error("oups", ex);
+        }
+    }
 
     public static void main(String[] args) throws IOException {
         USERS = Arrays.asList(User.getDefault());
@@ -65,16 +83,28 @@ public class SimFilesApp {
         }
 
         final int port = System.getProperty("port") == null ? 4567 : Integer.valueOf(System.getProperty("port"));
+        final String token = "0c8525cd-1866-4618-aa52-374c88393a6f";
         port(port);
+        final List<String> unsecurePaths = Arrays.asList("/explorer", "/resources");
+
+        exception(Exception.class, (exception, request, response) -> {
+            LOGGER.error("oups", exception);
+        });
 
         before((request, response) -> {
-            if (request.headers("Authorization") == null) {
+            if ("/".equals(request.uri())) {
+                response.redirect("/explorer", Redirect.Status.MOVED_PERMANENTLY.intValue());
+            }
+            
+            if (unsecurePaths.stream().anyMatch(prefixe -> request.uri().startsWith(prefixe))) {
+                LOGGER.debug("no problemo {}", request.uri());
+            } else if (request.headers("Authorization") == null) {
                 response.header("WWW-Authenticate", "Basic");
                 halt(401);
             } else {
                 User user = null;
                 for (User u : USERS) {
-                    String basic = Base64.encode((u.getId() + ":" + u.getPassword()).getBytes(StandardCharsets.UTF_8));
+                    String basic = "Basic " + Base64.encode((u.getId() + ":" + u.getPassword()).getBytes(StandardCharsets.UTF_8));
                     if (request.headers("Authorization").endsWith(basic)) {
                         user = u;
                         break;
@@ -84,9 +114,6 @@ public class SimFilesApp {
                 if (user == null) {
                     halt(403);
                 } else {
-                    if("/".equals(request.uri())){
-                        response.redirect("/explorer.html", Redirect.Status.MOVED_PERMANENTLY.intValue());
-                    }
                     LOGGER.debug("Connexion de {}", user.getId());
                 }
             }
@@ -102,11 +129,11 @@ public class SimFilesApp {
             if (!Files.exists(dir)) {
                 halt(404);
             }
-            if (!dir.toFile().isFile()) {
-                halt(400);
-            }
-
-            Files.delete(dir);
+            if (dir.toFile().isFile()) {
+                Files.delete(dir);
+            }else{
+                clear(dir);
+            }           
 
             return "";
         });
@@ -143,24 +170,52 @@ public class SimFilesApp {
                         fos.write(buffer, 0, read);
                     }
                     fos.flush();
-                } 
+                }
 
                 Files.copy(tempFileBinary, Paths.get(dir.toAbsolutePath().toString(), part.getSubmittedFileName()));
             }
 
             return "";
         });
+        get("/file", (request, response) -> {
+            String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
+            User user = getUser(request);
+            Path absPath = Paths.get(user.getDirectory(), path);
+            if (!absPath.toAbsolutePath().toString().startsWith(user.getDirectory())) {
+                halt(403);
+            }            
+            if (Files.notExists(absPath)) {
+                halt(404);
+            }            
+            if(Files.isDirectory(absPath)){
+                halt(405);
+            }
+            
+            response.header("Content-Type", Files.probeContentType(absPath)); 
+            response.header("Content-Disposition", "attachment; filename="+absPath.toFile().getName()); 
+            
+            return Files.newInputStream(absPath);
+        });
         get("/files", (request, response) -> {
             String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
             User user = getUser(request);
             Path dir = Paths.get(user.getDirectory(), path);
-            if(dir.toAbsolutePath().toString().startsWith(user.getDirectory())){
+            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
                 halt(403);
             }
-            
+
             List<SimFile> files = new ArrayList<>();
             Files.list(dir).
-                    sorted((a, b) -> a.toFile().isDirectory() ? -1 : 1). // reverse; files before dirs
+                    sorted((a, b)
+                            -> {
+                        if (a.toAbsolutePath().toAbsolutePath().toString().equals(b.toAbsolutePath().toString())) {
+                            return 0;
+                        } else if (a.toFile().isDirectory() && b.toFile().isFile()) {
+                            return -1;
+                        } else {
+                            return 1;
+                        }
+                    }). // reverse; files before dirs
                     forEach((Path p) -> {
                         String filename = p.getFileName().toString();
                         SimFile file = new SimFile(filename, !p.toFile().isFile());
@@ -181,22 +236,38 @@ public class SimFilesApp {
 
             return files;
         }, new JsonTransformer());
+        get("/explorer", (request, response) -> {
+            response.header("Content-Type", "text/html ;charset=utf-8");
 
+            return Thread.currentThread().getContextClassLoader().getResourceAsStream("explorer.html");
+        });
         get("/resources/*", (request, response) -> {
-            boolean isJs = request.uri().endsWith(".js"), isCss = request.uri().endsWith(".css"), isHTML = request.uri().endsWith(".html");
-            if (isJs || isCss) {
+                boolean isJs = request.uri().endsWith(".js"), 
+                        isCss = request.uri().endsWith(".css"), 
+                        isPng = request.uri().endsWith(".png"), 
+                        isJson = request.uri().endsWith(".json"), 
+                        isSvg = request.uri().endsWith(".svg"), 
+                        isFavi = request.uri().endsWith(".ico");
+            if (isJs || isCss || isPng || isFavi || isSvg) {
                 if (isJs) {
-                    response.header("Content-Type", "text/javascript ;charset=utf-8");
+                    response.header("Content-Type", "text/javascript");
                 } else if (isCss) {
-                    response.header("Content-Type", "text/css ;charset=utf-8");
-                }else if (isHTML) {
-                    response.header("Content-Type", "text/html ;charset=utf-8");
+                    response.header("Content-Type", "text/css");
+                } else if (isPng) {
+                    response.header("Content-Type", "image/png");
+                }else if (isFavi) {
+                    response.header("Content-Type", "image/x-icon");
+                }else if (isSvg) {
+                    response.header("Content-Type", "image/svg+xml");
+                }else if (isJson) {
+                    response.header("Content-Type", "application/json");
                 }
 
-                return Thread.currentThread().getContextClassLoader().getResourceAsStream(request.uri().replace("/resources/", "/web/"));
+                return Thread.currentThread().getContextClassLoader().getResourceAsStream(request.uri().replace("/resources/", ""));
             }
 
-            return null;
+            halt(404);
+            return "";
         });
     }
 
