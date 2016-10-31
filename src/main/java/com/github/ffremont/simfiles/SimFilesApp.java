@@ -43,6 +43,8 @@ import static spark.Spark.post;
 public class SimFilesApp {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SimFilesApp.class);
+    
+    private static final List<String> resourcesWhiteList = Arrays.asList(".js", ".css", ".png", ".json", ".ico", ".svg");
 
     private static Gson gson = new Gson();
     private static List<User> USERS;
@@ -123,7 +125,7 @@ public class SimFilesApp {
             User user = getUser(request);
             Path dir = Paths.get(user.getDirectory(), path);
 
-            if (dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
+            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
                 halt(403);
             }
             if (!Files.exists(dir)) {
@@ -141,7 +143,7 @@ public class SimFilesApp {
             String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
             User user = getUser(request);
             Path dir = Paths.get(user.getDirectory(), path);
-            if (dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
+            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
                 halt(403);
             }
 
@@ -242,31 +244,19 @@ public class SimFilesApp {
             return Thread.currentThread().getContextClassLoader().getResourceAsStream("explorer.html");
         });
         get("/resources/*", (request, response) -> {
-                boolean isJs = request.uri().endsWith(".js"), 
-                        isCss = request.uri().endsWith(".css"), 
-                        isPng = request.uri().endsWith(".png"), 
-                        isJson = request.uri().endsWith(".json"), 
-                        isSvg = request.uri().endsWith(".svg"), 
-                        isFavi = request.uri().endsWith(".ico");
-            if (isJs || isCss || isPng || isFavi || isSvg) {
-                if (isJs) {
-                    response.header("Content-Type", "text/javascript");
-                } else if (isCss) {
-                    response.header("Content-Type", "text/css");
-                } else if (isPng) {
-                    response.header("Content-Type", "image/png");
-                }else if (isFavi) {
-                    response.header("Content-Type", "image/x-icon");
-                }else if (isSvg) {
-                    response.header("Content-Type", "image/svg+xml");
-                }else if (isJson) {
-                    response.header("Content-Type", "application/json");
-                }
-
-                return Thread.currentThread().getContextClassLoader().getResourceAsStream(request.uri().replace("/resources/", ""));
+           if (!resourcesWhiteList.stream().anyMatch(prefixe -> request.uri().endsWith(prefixe))) {
+                halt(403);
             }
-
-            halt(404);
+            
+            if (request.uri().contains(".")) {
+                String mime = Files.probeContentType(Paths.get(request.uri()));
+                                
+                response.header("Content-Type", mime);
+                return Thread.currentThread().getContextClassLoader().getResourceAsStream(request.uri().replace("/resources/", ""));
+            }else{
+                halt(421);
+            }
+            
             return "";
         });
     }
