@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.servlet.MultipartConfigElement;
@@ -81,12 +82,23 @@ public class SimFilesApp {
     }
 
     public static void main(String[] args) throws IOException {
-        USERS = Arrays.asList(User.getDefault());
-        if (args.length != 0) {
-            USERS = Arrays.asList(gson.fromJson(new String(Files.readAllBytes(Paths.get(args[0])), StandardCharsets.UTF_8), User[].class));
+        InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("header.txt");
+        try (Scanner scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name())) {
+            System.out.print(scanner.useDelimiter("\\A").next());
+            System.out.println("\n\n");
         }
-
+        
+        String confFile = System.getProperty("conf");
+        if(confFile == null){
+            USERS = Arrays.asList(User.getDefault());
+        }else{
+            LOGGER.info("Chargement du fichier de configuration {}", confFile);
+            byte[] jsonB = Files.readAllBytes(Paths.get(confFile));
+            USERS = Arrays.asList(gson.fromJson(new String(jsonB, StandardCharsets.UTF_8), User[].class));
+        }
+        
         final int port = System.getProperty("port") == null ? 4567 : Integer.valueOf(System.getProperty("port"));
+        LOGGER.info("Démarrage du serveur sur le port {}", port);
         port(port);
         final List<String> unsecurePaths = Arrays.asList("/explorer", "/resources");
 

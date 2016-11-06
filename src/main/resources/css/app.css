@@ -311,6 +311,9 @@ responsive
 #modal-close {
     background: #fff url('/resources/img/modal-close.png') no-repeat center center;
 }
+#modal-header, #modal-close{
+    margin:0;
+}
 
 #dnd-files {
     width: 500px;

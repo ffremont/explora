@@ -16,7 +16,7 @@
 
     <body>
         <nav class="demo">
-            <h1 class="brand"><a href="/" onclick="goto('/')">
+            <h1 class="brand"><a href="/" onclick="goto(event, '/')">
                     <img class="visible-phone" src="resources/img/cloud.svg" />
                     <span class="hide-phone">Explor@</span>
                 </a></h1>
@@ -35,18 +35,18 @@
         <div id="modal-add-folder"></div>
 
         <div>
-            <div id="add-mask" class="hide" onclick="toggleAdd()"></div>
+            <div id="add-mask" class="hide" onclick="toggleAdd(event)"></div>
             <div class="adds ">
-                <div class="plus" onclick="toggleAdd()">
+                <div class="plus" onclick="toggleAdd(event)">
                     <img src="resources/img/add-1.svg" />
                 </div>
 
-                <div id="add-file-folder" onclick="toggleAdd()">
-                    <div id="add-folder" class="hide" onclick="addFolder()" title="Créer un répertoire">
+                <div id="add-file-folder" onclick="toggleAdd(event)">
+                    <div id="add-folder" class="hide" onclick="addFolder(event)" title="Créer un répertoire">
                         <img src="resources/img/folder-10.svg" alt="dossier"/>
                     </div>
 
-                    <div id="add-file" class="hide" onclick="addFile()" title="Déposer des fichiers">
+                    <div id="add-file" class="hide" onclick="addFile(event)" title="Déposer des fichiers">
                         <img src="resources/img/file.svg" alt="fichier"/>
                     </div>
                 </div>
@@ -82,7 +82,7 @@
         </div>
         
         <div class="state-bar">
-            <div id="space-gauge" class="meter hide" title="Espace occupé à 85%">
+            <div id="space-gauge" class="meter hide" title="Espace occupé à x%">
               <span class="yellow" style=""></span>
             </div>
         </div>

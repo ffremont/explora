@@ -11,11 +11,13 @@
     window.refresh = function () {
         loadData();
     };
-    window.toggleAdd = function () {
-        if (event.defaultPrevented) {
+    window.toggleAdd = function (event) {
+        if (event && event.defaultPrevented) {
             return;
         }
-        event.preventDefault();
+        if(event){
+            event.preventDefault();
+        }
         var mask = document.getElementById('add-mask'),
             file = document.getElementById('add-file'),
             folder = document.getElementById('add-folder');
@@ -30,7 +32,7 @@
             folder.className = "";
         }
     };
-    window.creerDossier = function () {
+    window.creerDossier = function (event) {
         event.preventDefault();
         var val = document.getElementById('add-folder-value').value;
         Modal.close();
@@ -57,8 +59,8 @@
                 alert('Echec de la création du répertoire.');
             });
     };
-    window.addFile = function () {
-        window.toggleAdd();
+    window.addFile = function (event) {
+        window.toggleAdd(event);
         Modal.open({
             hideclose: false,
             content: `
@@ -84,13 +86,13 @@
             }
         });
     };
-    window.addFolder = function () {
-        window.toggleAdd();
+    window.addFolder = function (event) {
+        window.toggleAdd(event);
         Modal.open({
             content: `
                     <h2>Créer un dossier</h2>
                     
-                    <form onsubmit="creerDossier()">
+                    <form onsubmit="creerDossier(event)">
                         <input type="text" required id="add-folder-value"  />
                         <br/>
                         <button type="submit" class="success">Créer</button> <button type="button" onclick="Modal.close()">Annuler</button>
@@ -99,17 +101,17 @@
             draggable: true
         });
     };
-    window.goto = function (path) {
+    window.goto = function (event, path) {
         event.preventDefault();
         window.location.hash = path;
         loadData();
         document.getElementById('rechercher').value = '';
     }
-    window.download = function (el) {
+    window.download = function (event, el) {
         var path = window.location.hash ? getHash() : '';
         window.location.href = `${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?path=${path}/${el.getAttribute('data-filename')}`;
     };
-    window.onClickItem = function (el) {
+    window.onClickItem = function (event, el) {
         if (event.defaultPrevented) {
             return;
         }
@@ -130,7 +132,7 @@
         loadData();
         document.getElementById('rechercher').value = '';
     };
-    window.supp = function (el) {
+    window.supp = function (event, el) {
         event.preventDefault();
         var filename = el.getAttribute('data-filename');
         if (confirm(`Voulez - vous supprimer "${filename}" ?`)) {
@@ -152,7 +154,7 @@
                 })
         }
     };
-    window.voir = function (el) {
+    window.voir = function (event, el) {
         event.preventDefault();
         var filename = el.getAttribute('data-filename');
         // todo
@@ -168,7 +170,7 @@
         document.getElementById("items").innerHTML = '';
         if (window.location.hash &&  (window.location.hash !== '#/')) {
             var el = `
-                <article class = "card" data-isdir = "false" data-filename = ".." onclick = "onClickItem(this)">
+                <article class = "card" data-isdir = "false" data-filename = ".." onclick = "onClickItem(event, this)">
                 <h3> .. </h3>
                 </article>
                 `;
@@ -180,7 +182,7 @@
             var ext = item.tags && item.tags.length ? item.tags[0] : '';
             var extension = item.filename.indexOf('.') === -1 ? 'file' : item.filename.substr( item.filename.lastIndexOf('.')).replace('.', '').toLowerCase();
             var cls = '';
-            var btnVoir = `<img src = "resources/img/view.svg" title = "Consulter le fichier" onclick = "voir(this)" data-filename = "${item.filename}" />`;
+            var btnVoir = `<img src = "resources/img/view.svg" title = "Consulter le fichier" onclick = "voir(event,this)" data-filename = "${item.filename}" />`;
             var icon = ` <img src = "resources/img/${extension}.svg" onerror="this.src='resources/img/file.svg'" alt= "fichier"/> `;
             var downloadEl = ` <img onclick = "download(this)" title = "Télécharger" src = "resources/img/download.svg" data-filename = "${item.filename}" /> `;
             if (item.isDir) {
@@ -189,13 +191,13 @@
                 btnVoir='';
             }
             var el = `
-                <article class = "card ${cls}" onclick = "onClickItem(this)" data-filename = "${item.filename}" data-isdir = "${item.isDir}">
+                <article class = "card ${cls}" onclick = "onClickItem(event, this)" data-filename = "${item.filename}" data-isdir = "${item.isDir}">
                 ${icon}
         <h3>
                 ${item.filename} <span class = "size"> ${item.labelSize} </span> 
 
                 
-                <img src = "resources/img/garbage.svg" title = "Supprimer" onclick = "supp(this)" data-filename = "${item.filename}" />
+                <img src = "resources/img/garbage.svg" title = "Supprimer" onclick = "supp(event, this)" data-filename = "${item.filename}" />
                 
                 ${downloadEl}
                 ${btnVoir}
