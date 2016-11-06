@@ -1,56 +1,95 @@
 <!DOCTYPE html>
 <html>
 
-<head>
-    <title>Explor@</title>
-    <link rel="icon" href="resources/img/cloud.svg" type="image/svg+xml" />
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <head>
+        <title>Explor@</title>
+        <link rel="icon" href="resources/img/cloud.svg" type="image/svg+xml" />
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="resources/css/picnic.min.css">
-    <link rel="stylesheet" href="resources/css/app.css">
-</head>
+        <link rel="stylesheet" href="resources/css/jsmodal-light.css">
+        <link rel="stylesheet" href="resources/css/meter.css">
+        <link rel="stylesheet" href="resources/css/picnic.min.css">
+        <link rel="stylesheet" href="resources/css/dropzone.css">
+        <link rel="stylesheet" href="resources/css/app.css">
+    </head>
 
-<body>
-    <nav class="demo">
-        <h1 class="brand">Explor@</h1>
+    <body>
+        <nav class="demo">
+            <h1 class="brand"><a href="/" onclick="goto('/')">
+                    <img class="visible-phone" src="resources/img/cloud.svg" />
+                    <span class="hide-phone">Explor@</span>
+                </a></h1>
 
-        <div class="menu">
-            <input placeholder="rechercher..." type="search" id="rechercher" />
-        </div>
-    </nav>
+            <div class="menu">
+                <input placeholder="rechercher..." type="search" id="rechercher" />
 
-    <div id="items">
-
-    </div>
-
-    <div id="login">
-        <div class="mask"></div>
-        <form id="login-form" onsubmit="submit">
-            <div class="third">
-                <input class="stack" id="u" placeholder="Utilisateur" type="text" required />
-                <input class="stack" id="p" placeholder="Email" type="password" required />
-                <button type="submit" class="stack icon-paper-plane">
-                    Se connecter
-                </button>
+                <img src="resources/img/repeat-1.svg" title="Actualiser" onclick="refresh()" />
             </div>
-        </form>
+        </nav>
 
-    </div>
+        <div id="items">
 
-    <div id="loader" class="hide">
-        <div class="mask"></div>
-        <div class="cssload-container">
-            <div class="cssload-whirlpool"></div>
         </div>
-    </div>
 
-    <div id="add">
-        <div class="folder"></div>
-        <div class="files"></div>
-    </div>
+        <div id="modal-add-folder"></div>
 
-    <script type="text/javascript" src="resources/js/download.js"></script>
-</body>
+        <div>
+            <div id="add-mask" class="hide" onclick="toggleAdd()"></div>
+            <div class="adds ">
+                <div class="plus" onclick="toggleAdd()">
+                    <img src="resources/img/add-1.svg" />
+                </div>
+
+                <div id="add-file-folder" onclick="toggleAdd()">
+                    <div id="add-folder" class="hide" onclick="addFolder()" title="Créer un répertoire">
+                        <img src="resources/img/folder-10.svg" alt="dossier"/>
+                    </div>
+
+                    <div id="add-file" class="hide" onclick="addFile()" title="Déposer des fichiers">
+                        <img src="resources/img/file.svg" alt="fichier"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div id="login">
+            <div class="mask"></div>
+            <form id="login-form" onsubmit="submit">
+                <div class="third">
+                    <input class="stack" id="u" placeholder="Utilisateur" type="text" required />
+                    <input class="stack" id="p" placeholder="Email" type="password" required />
+                    <button type="submit" class="stack icon-paper-plane">
+                        Se connecter
+                    </button>
+                </div>
+            </form>
+
+        </div>
+
+        
+        <div id="loader" class="hide">
+            <div class="mask"></div>
+            <div class="cssload-container">
+                <div class="cssload-whirlpool"></div>
+            </div>
+        </div>
+
+        <div id="add">
+            <div class="folder"></div>
+            <div class="files"></div>
+        </div>
+        
+        <div class="state-bar">
+            <div id="space-gauge" class="meter hide" title="Espace occupé à 85%">
+              <span class="yellow" style=""></span>
+            </div>
+        </div>
+
+        <script type="text/javascript" src="resources/js/dropzone.js"></script>
+        <script type="text/javascript" src="resources/js/jsmodal-1.0d.min.js"></script>
+        <script type="text/javascript" src="resources/js/download.js"></script>
+    </body>
 
 </html>

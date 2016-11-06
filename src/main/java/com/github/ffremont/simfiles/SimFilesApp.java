@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.http.Part;
+import org.eclipse.jetty.util.MultiPartInputStreamParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Redirect;
@@ -43,7 +44,7 @@ import static spark.Spark.post;
 public class SimFilesApp {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SimFilesApp.class);
-    
+
     private static final List<String> resourcesWhiteList = Arrays.asList(".js", ".css", ".png", ".json", ".ico", ".svg");
 
     private static Gson gson = new Gson();
@@ -61,7 +62,7 @@ public class SimFilesApp {
 
         return user;
     }
-    
+
     private static void clear(Path directoryToDelete) {
         try {
             if (Files.exists(directoryToDelete)) {
@@ -70,7 +71,8 @@ public class SimFilesApp {
                         forEach(p -> {
                             try {
                                 Files.delete(p);
-                            } catch (IOException e) { /* ... */ }
+                            } catch (IOException e) {
+                                /* ... */ }
                         });
             }
         } catch (IOException ex) {
@@ -85,7 +87,6 @@ public class SimFilesApp {
         }
 
         final int port = System.getProperty("port") == null ? 4567 : Integer.valueOf(System.getProperty("port"));
-        final String token = "0c8525cd-1866-4618-aa52-374c88393a6f";
         port(port);
         final List<String> unsecurePaths = Arrays.asList("/explorer", "/resources");
 
@@ -97,7 +98,7 @@ public class SimFilesApp {
             if ("/".equals(request.uri())) {
                 response.redirect("/explorer", Redirect.Status.MOVED_PERMANENTLY.intValue());
             }
-            
+
             if (unsecurePaths.stream().anyMatch(prefixe -> request.uri().startsWith(prefixe))) {
                 LOGGER.debug("no problemo {}", request.uri());
             } else if (request.headers("Authorization") == null) {
@@ -121,50 +122,65 @@ public class SimFilesApp {
             }
         });
         delete("/files", (request, response) -> {
-            String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
-            User user = getUser(request);
-            Path dir = Paths.get(user.getDirectory(), path);
-
-            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
-                halt(403);
-            }
-            if (!Files.exists(dir)) {
+            MyContext myContext = MyContext.get(request);
+            if (!Files.exists(myContext.path)) {
                 halt(404);
             }
-            if (dir.toFile().isFile()) {
-                Files.delete(dir);
-            }else{
-                clear(dir);
-            }           
+            if (myContext.path.toFile().isFile()) {
+                Files.delete(myContext.path);
+            } else {
+                clear(myContext.path);
+            }
+
+            return "";
+        });
+        post("/folder", (request, response) -> {
+            MyContext myContext = MyContext.get(request);
+            String folderName = request.queryParams("name");
+            if (folderName != null) {
+                folderName = folderName.replace("..", "");
+            } else {
+                LOGGER.debug(("Nom de répertoire invalide"));
+                halt(400);
+            }
+            
+            Path dir = Paths.get(myContext.path.toAbsolutePath().toString(), folderName);
+            if (!dir.toAbsolutePath().toString().startsWith(myContext.user.getDirectory())) {
+                halt(403);
+            }
+            
+            if (Files.exists(dir)) {
+                halt(204);
+            } else if (!Files.exists(dir.getParent())) {
+                LOGGER.debug("Le répertoire parent n'existe pas");
+                halt(400);
+            } else {
+                Files.createDirectory(dir);
+                halt(204);
+            }
 
             return "";
         });
         post("/files", (request, response) -> {
-            String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
-            User user = getUser(request);
-            Path dir = Paths.get(user.getDirectory(), path);
-            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
-                halt(403);
-            }
+            MyContext myContext = MyContext.get(request);
 
-            if (Files.notExists(dir)) {
+            if (Files.notExists(myContext.path)) {
                 halt(404);
             }
 
             long maxFileSize = 100000000;  // the maximum size allowed for uploaded files
             long maxRequestSize = 100000000;  // the maximum size allowed for multipart/form-data requests
             int fileSizeThreshold = 10240;  // the size threshold after which files will be written to disk
-            MultipartConfigElement multipartConfigElement = new MultipartConfigElement(dir.toAbsolutePath().toString(), maxFileSize, maxRequestSize, fileSizeThreshold);
+            MultipartConfigElement multipartConfigElement = new MultipartConfigElement(myContext.path.toAbsolutePath().toString(), maxFileSize, maxRequestSize, fileSizeThreshold);
             request.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
 
             Collection<Part> parts = request.raw().getParts();
             for (Part part : parts) {
-                if (Files.exists(Paths.get(dir.toAbsolutePath().toString(), part.getSubmittedFileName()))) {
+                if (Files.exists(Paths.get(myContext.path.toAbsolutePath().toString(), part.getSubmittedFileName()))) {
                     halt(409);
                 }
 
-                Path tempFileBinary = Files.createTempFile("simFiles", "upload");
-                FileOutputStream fos = new FileOutputStream(tempFileBinary.toFile());
+                FileOutputStream fos = new FileOutputStream(Paths.get(myContext.path.toAbsolutePath().toString(), part.getSubmittedFileName()).toFile());
                 try (InputStream is = part.getInputStream()) {
                     byte[] buffer = new byte[10240]; // 10ko
                     int read;
@@ -174,40 +190,43 @@ public class SimFilesApp {
                     fos.flush();
                 }
 
-                Files.copy(tempFileBinary, Paths.get(dir.toAbsolutePath().toString(), part.getSubmittedFileName()));
+                part.delete();
             }
 
             return "";
         });
         get("/file", (request, response) -> {
-            String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
-            User user = getUser(request);
-            Path absPath = Paths.get(user.getDirectory(), path);
-            if (!absPath.toAbsolutePath().toString().startsWith(user.getDirectory())) {
-                halt(403);
-            }            
-            if (Files.notExists(absPath)) {
+            MyContext myContext = MyContext.get(request);
+            if (Files.notExists(myContext.path)) {
                 halt(404);
-            }            
-            if(Files.isDirectory(absPath)){
+            }
+            if (Files.isDirectory(myContext.path)) {
                 halt(405);
             }
-            
-            response.header("Content-Type", Files.probeContentType(absPath)); 
-            response.header("Content-Disposition", "attachment; filename="+absPath.toFile().getName()); 
-            
-            return Files.newInputStream(absPath);
+
+            response.header("Content-Type", Files.probeContentType(myContext.path));
+            response.header("Content-Disposition", "attachment; filename=" + myContext.path.toFile().getName());
+
+            return Files.newInputStream(myContext.path);
         });
-        get("/files", (request, response) -> {
-            String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
-            User user = getUser(request);
-            Path dir = Paths.get(user.getDirectory(), path);
-            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
-                halt(403);
+        get("/file/view", (request, response) -> {
+            MyContext myContext = MyContext.get(request);
+            if (Files.notExists(myContext.path)) {
+                halt(404);
+            }
+            if (Files.isDirectory(myContext.path)) {
+                halt(405);
             }
 
+            response.header("Content-Type", Files.probeContentType(myContext.path));
+
+            return Files.newInputStream(myContext.path);
+        });
+        get("/files", (request, response) -> {
+            MyContext myContext = MyContext.get(request);
+
             List<SimFile> files = new ArrayList<>();
-            Files.list(dir).
+            Files.list(myContext.path).
                     sorted((a, b)
                             -> {
                         if (a.toAbsolutePath().toAbsolutePath().toString().equals(b.toAbsolutePath().toString())) {
@@ -236,7 +255,7 @@ public class SimFilesApp {
                         files.add(file);
                     });
 
-            return files;
+            return new SimFolder(myContext.path.toAbsolutePath().toString(), myContext.path.toFile().getFreeSpace(), myContext.path.toFile().getTotalSpace(), files);
         }, new JsonTransformer());
         get("/explorer", (request, response) -> {
             response.header("Content-Type", "text/html ;charset=utf-8");
@@ -244,21 +263,44 @@ public class SimFilesApp {
             return Thread.currentThread().getContextClassLoader().getResourceAsStream("explorer.html");
         });
         get("/resources/*", (request, response) -> {
-           if (!resourcesWhiteList.stream().anyMatch(prefixe -> request.uri().endsWith(prefixe))) {
+            if (!resourcesWhiteList.stream().anyMatch(prefixe -> request.uri().endsWith(prefixe))) {
+                halt(403);
+            }
+
+            if (request.uri().contains(".")) {
+                String mime = Files.probeContentType(Paths.get(request.uri()));
+
+                response.header("Content-Type", mime);
+                return Thread.currentThread().getContextClassLoader().getResourceAsStream(request.uri().replace("/resources/", ""));
+            } else {
+                halt(421);
+            }
+
+            return "";
+        });
+    }
+
+    private static class MyContext {
+
+        private MyContext(User user, Path path) {
+            this.user = user;
+            this.path = path;
+        }
+
+        public User user;
+        private Path path;
+
+        public static MyContext get(Request request) {
+            String path = request.queryParams("path") == null ? "" : request.queryParams("path").replace("..", "");
+            User user = getUser(request);
+            Path dir = Paths.get(user.getDirectory(), path);
+
+            if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
                 halt(403);
             }
             
-            if (request.uri().contains(".")) {
-                String mime = Files.probeContentType(Paths.get(request.uri()));
-                                
-                response.header("Content-Type", mime);
-                return Thread.currentThread().getContextClassLoader().getResourceAsStream(request.uri().replace("/resources/", ""));
-            }else{
-                halt(421);
-            }
-            
-            return "";
-        });
+            return new MyContext(user, dir);
+        }
     }
 
 }

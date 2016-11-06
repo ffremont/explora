@@ -23,6 +23,7 @@ public class SimFile {
     private String labelSize;
     
     private long modified;
+    
 
     public SimFile(String filename, boolean isDir) {
         this.filename = filename;

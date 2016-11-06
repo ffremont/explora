@@ -8,25 +8,154 @@
         while (i = a.firstChild) b.appendChild(i);
         return b;
     };
+    window.refresh = function () {
+        loadData();
+    };
+    window.toggleAdd = function () {
+        if (event.defaultPrevented) {
+            return;
+        }
+        event.preventDefault();
+        var mask = document.getElementById('add-mask'),
+            file = document.getElementById('add-file'),
+            folder = document.getElementById('add-folder');
+        if (mask.className.indexOf('hide') === -1) {
+            // hide adds
+            mask.className = "hide";
+            file.className = "hide";
+            folder.className = "hide";
+        } else {
+            mask.className = "";
+            file.className = "";
+            folder.className = "";
+        }
+    };
+    window.creerDossier = function () {
+        event.preventDefault();
+        var val = document.getElementById('add-folder-value').value;
+        Modal.close();
 
-    window.onClickItem = function (el) {
+        document.getElementById('loader').className = '';
+        fetch('/folder?path=' + getHash(), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    Authorization: 'Basic ' + btoa(window.user + ':' + window.password)
+                },
+                method: 'POST',
+                body: 'name=' + encodeURIComponent(val)
+            })
+            .then(function (response) {
+                if (response.status !== 204) {
+                    throw "oups";
+                }
+
+                document.getElementById('loader').className = 'hide';
+                window.refresh();
+            })
+            .catch(function () {
+                document.getElementById('loader').className = 'hide';
+                alert('Echec de la création du répertoire.');
+            });
+    };
+    window.addFile = function () {
+        window.toggleAdd();
+        Modal.open({
+            hideclose: false,
+            content: `
+                    <form id="dnd-files" action="/files" class="dropzone">
+                        
+                    </form>
+                `,
+            draggable: true,
+            closeCallback: function(){
+                window.refresh();
+            }
+        });
+        new Dropzone("#dnd-files", {
+            url: '/files?path=' + getHash() || '/',
+            paramName: "file", // The name that will be used to transfer the file
+            maxFilesize: 5120, // MB
+            dictDefaultMessage: 'Glisser ici vos fichiers',
+            headers : {
+                Authorization: 'Basic ' + btoa(window.user + ':' + window.password)
+            },
+            complete: function(){
+                Modal.close();
+            }
+        });
+    };
+    window.addFolder = function () {
+        window.toggleAdd();
+        Modal.open({
+            content: `
+                    <h2>Créer un dossier</h2>
+                    
+                    <form onsubmit="creerDossier()">
+                        <input type="text" required id="add-folder-value"  />
+                        <br/>
+                        <button type="submit" class="success">Créer</button> <button type="button" onclick="Modal.close()">Annuler</button>
+                    </form>
+                `,
+            draggable: true
+        });
+    };
+    window.goto = function (path) {
+        event.preventDefault();
+        window.location.hash = path;
+        loadData();
+        document.getElementById('rechercher').value = '';
+    }
+    window.download = function (el) {
         var path = window.location.hash ? getHash() : '';
-
+        window.location.href = `${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?path=${path}/${el.getAttribute('data-filename')}`;
+    };
+    window.onClickItem = function (el) {
+        if (event.defaultPrevented) {
+            return;
+        }
+        var path = window.location.hash ? getHash() : '';
         if (el.getAttribute('data-filename') === '..') {
             var parent = path.substr(0, path.lastIndexOf('/'));
             window.location.hash = parent || '/';
         } else {
             if (el.getAttribute('data-isdir') === 'true') {
-                window.location.hash = `${path}/${el.getAttribute('data-filename')}`;
+                path = path === '/' ? path : path + '/';
+                window.location.hash = `${path}${el.getAttribute('data-filename')}`;
             } else {
-                window.location.href = `${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?path=${path}/${el.getAttribute('data-filename')}`;
-                console.log(`${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?path=${path}/${el.getAttribute('data-filename')}`);
+                return;
+                // window.location.href = `${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?path=${path}/${el.getAttribute('data-filename')}`;
             }
         }
 
         loadData();
         document.getElementById('rechercher').value = '';
+    };
+    window.supp = function (el) {
+        event.preventDefault();
+        var filename = el.getAttribute('data-filename');
+        if (confirm(`Voulez - vous supprimer "${filename}" ?`)) {
+            fetch(`/files?path=${getHash()}/${filename}`, {
+                    method: 'DELETE',
+                    headers: {
+                        Accept: 'application/json',
+                        Authorization: 'Basic ' + btoa(window.user + ':' + window.password)
+                    }
+                }).then(function (response) {
+                    if (response.status !== 200) {
+                        throw "oups";
+                    }
 
+                    window.refresh();
+                })
+                .catch(function () {
+                    alert('Echec de la suppression de l\'élément.');
+                })
+        }
+    };
+    window.voir = function (el) {
+        event.preventDefault();
+        var filename = el.getAttribute('data-filename');
+        // todo
     };
 
     function render() {
@@ -37,11 +166,10 @@
             return (item.filename.toLowerCase().indexOf(vFilter.toLowerCase()) !== -1);
         }) : items;
         document.getElementById("items").innerHTML = '';
-
-        if (window.location.hash !== '#/') {
+        if (window.location.hash &&  (window.location.hash !== '#/')) {
             var el = `
-                <article class = "card" data-isdir="false" data-filename=".." onclick="onClickItem(this)" >
-                <h3 > .. </h3>
+                <article class = "card" data-isdir = "false" data-filename = ".." onclick = "onClickItem(this)">
+                <h3> .. </h3>
                 </article>
                 `;
             document.getElementById("items").appendChild(el.toDOM());
@@ -50,16 +178,29 @@
         for (var index in itemsFiltered) {
             var item = itemsFiltered[index];
             var ext = item.tags && item.tags.length ? item.tags[0] : '';
+            var extension = item.filename.indexOf('.') === -1 ? 'file' : item.filename.substr( item.filename.lastIndexOf('.')).replace('.', '').toLowerCase();
             var cls = '';
-            var icon = ` <img src = "resources/img/file.svg" alt = "fichier" /> `;
+            var btnVoir = `<img src = "resources/img/view.svg" title = "Consulter le fichier" onclick = "voir(this)" data-filename = "${item.filename}" />`;
+            var icon = ` <img src = "resources/img/${extension}.svg" onerror="this.src='resources/img/file.svg'" alt= "fichier"/> `;
+            var downloadEl = ` <img onclick = "download(this)" title = "Télécharger" src = "resources/img/download.svg" data-filename = "${item.filename}" /> `;
             if (item.isDir) {
                 icon = ` <img src = "resources/img/folder-5.svg" alt = "fichier" /> `;
+                downloadEl = '';
+                btnVoir='';
             }
             var el = `
-                <article class = "card ${cls}" onclick="onClickItem(this)" data-filename="${item.filename}" data-isdir = "${item.isDir}" >
+                <article class = "card ${cls}" onclick = "onClickItem(this)" data-filename = "${item.filename}" data-isdir = "${item.isDir}">
                 ${icon}
         <h3>
-                ${item.filename} <span class="size">${item.labelSize}</span> </h3>
+                ${item.filename} <span class = "size"> ${item.labelSize} </span> 
+
+                
+                <img src = "resources/img/garbage.svg" title = "Supprimer" onclick = "supp(this)" data-filename = "${item.filename}" />
+                
+                ${downloadEl}
+                ${btnVoir}
+
+        </h3>
                 </article>
                 `;
             document.getElementById("items").appendChild(el.toDOM());
@@ -84,7 +225,20 @@
             })
             .then(function (data) {
                 document.getElementById('loader').className = 'hide';
-                window.items = data;
+                window.items = data.files;
+            // barre d'info sur l'espace disque
+                var gaugeEl = document.getElementById('space-gauge');
+                var gaugeSpanEl = document.querySelector('#space-gauge span');
+                gaugeEl.title = `Espace occupé à ${data.ratioSpace} %`;
+                gaugeSpanEl.className = 'blue';
+                if((data.ratioSpace > 75) && (data.ratioSpace < 92)){
+                    gaugeSpanEl.className = 'yellow';
+                } else if(data.ratioSpace >= 92){
+                    gaugeSpanEl.className = 'red';
+                }
+                gaugeSpanEl.setAttribute('style', `width: ${data.ratioSpace}%`);
+                gaugeEl.className = gaugeEl.className.replace(' hide', '');
+            
                 render();
             })
             .catch(function (e) {

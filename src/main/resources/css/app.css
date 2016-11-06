@@ -56,23 +56,26 @@ h1 > a.label {
     font-size: 39%;
 }
 
-.mask {
-    position: absolute;
+.mask,
+#add-mask {
+    position: fixed;
     top: 0;
     bottom: 0;
     left: 0;
     right: 0;
-    background: white;
+    background: black;
     opacity: 0.5;
     z-index: 99999;
 }
 
+#add-mask {
+    background: white;
+}
+
 #login {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    position: relative;
+    width: 100%;
+    height: 100%;
 }
 
 .third {
@@ -89,7 +92,7 @@ h1 > a.label {
 }
 
 .hide {
-    display: none;
+    display: none !important;
 }
 
 .shyButton {
@@ -98,6 +101,21 @@ h1 > a.label {
 
 nav .brand {
     width: 200px;
+}
+
+article h3 img {
+    float: right;
+    width: 32px;
+    margin: 0;
+    cursor: pointer;
+}
+
+article h3 img + img {
+    margin-right: 10px;
+}
+
+nav .menu{
+    margin-top: 0 !important;  
 }
 
 nav .brand,
@@ -199,9 +217,128 @@ nav .burger {
     }
 }
 
+.menu img {
+    width: 30px;
+    float: right;
+    margin-top: 3px;
+    cursor: pointer
+}
+
+input,
+textarea,
+.select select {
+    width: auto;
+}
+
+.adds {
+    z-index: 99999;
+}
+
+.adds .plus {
+    text-align: center;
+    border: 1px solid #23a24d;
+    width: 60px;
+    height: 60px;
+    border-radius: 30px;
+    padding-top: 9px;
+    position: fixed;
+    right: 10px;
+    bottom: 15px;
+    background: white;
+    cursor: pointer;
+}
+
+#add-file-folder > div+div {
+    margin-left: 80px;
+}
+
+#add-file-folder {
+    position: fixed;
+    left: 0;
+    right: 0;
+    text-align: center;
+    top: 10%;
+    z-index: 9999999;
+}
+
+#add-file,
+#add-folder {
+    display: inline-block;
+    cursor: pointer;
+    width: 270px;
+    height: 270px;
+    border-radius: 127px;
+    background: rgba(0, 116, 217, 0.36);
+    padding-top: 30px;
+    padding-left: 9px;
+}
+
+#add-file {
+    bottom: 84px;
+}
+
+#add-folder {
+    bottom: 152px;
+}
+
+.adds .plus img {
+    width: 40px;
+}
+
+#add-file img,
+#add-folder img {
+    width: 200px;
+}
+
 
 /**
 responsive
 */
 
-@media screen and (max-width: 320px) {}
+.visible-phone {
+    display: none;
+}
+
+@media screen and (max-width: 320px) {
+    .hide-phone {
+        display: none;
+    }
+    .visible-phone {
+        display: block
+    }
+}
+
+#modal-close {
+    background: #fff url('/resources/img/modal-close.png') no-repeat center center;
+}
+
+#dnd-files {
+    width: 500px;
+    height: 400px;
+}
+
+#modal-container {
+    z-index: 999999;
+}
+
+#items {
+    padding-bottom: 60px;
+}
+
+.meter{
+        margin-left: 10px;
+}
+
+.state-bar > div {
+    display: inline-block;
+}
+
+.state-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    margin: 0;
+    background: rgba(128, 128, 128, 0.09);
+}
