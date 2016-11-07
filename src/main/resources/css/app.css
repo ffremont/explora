@@ -103,7 +103,12 @@ nav .brand {
     width: 200px;
 }
 
-article h3 img {
+article h3 a{
+    margin-right: 10px;
+    margin-top: 3px;
+}
+
+article h3 img, article h3 a {
     float: right;
     width: 32px;
     margin: 0;

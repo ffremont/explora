@@ -21,6 +21,7 @@ public class SimFile {
     private String filename;
     private long size;
     private String labelSize;
+    private String checksum;
     
     private long modified;
     
@@ -54,6 +55,16 @@ public class SimFile {
                 = divider > 1 ? (double) value / (double) divider : (double) value;
         return new DecimalFormat("#,##0.#").format(result) + " " + unit;
     }
+
+    public String getChecksum() {
+        return checksum;
+    }
+
+    public void setChecksum(String checksum) {
+        this.checksum = checksum;
+    }
+    
+    
 
     public boolean isIsDir() {
         return isDir;

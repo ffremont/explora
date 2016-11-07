@@ -124,7 +124,7 @@
     }
     window.download = function (event, el) {
         var path = window.location.hash ? getHash() : '';
-        window.location.href = `${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?path=${path}/${el.getAttribute('data-filename')}`;
+        window.location.href = `${location.protocol}//${window.user}:${window.password}@${location.hostname}:${location.port}/file?download=true&path=${path}/${el.getAttribute('data-filename')}`;
     };
     window.onClickItem = function (event, el) {
         if (event.defaultPrevented) {
@@ -169,11 +169,6 @@
                 })
         }
     };
-    window.voir = function (event, el) {
-        event.preventDefault();
-        var filename = el.getAttribute('data-filename');
-        // todo
-    };
 
     function render() {
         var items = window.items;
@@ -192,12 +187,16 @@
             document.getElementById("items").appendChild(el.toDOM());
         }
 
+        var path = window.location.hash ? getHash() : '';
         for (var index in itemsFiltered) {
             var item = itemsFiltered[index];
             var ext = item.tags && item.tags.length ? item.tags[0] : '';
             var extension = item.filename.indexOf('.') === -1 ? 'file' : item.filename.substr( item.filename.lastIndexOf('.')).replace('.', '').toLowerCase();
             var cls = '';
-            var btnVoir = `<img src = "resources/img/view.svg" title = "Consulter le fichier" onclick = "voir(event,this)" data-filename = "${item.filename}" />`;
+                        
+            var href = `${location.protocol}//${location.hostname}:${location.port}/file?path=${path}/${item.filename}`;
+            
+            var btnVoir = `<a href="${href}" target="_blank"><img src = "resources/img/view.svg" title = "Consulter le fichier"  /></a>`;
             var icon = ` <img src = "resources/img/${extension}.svg" onerror="this.src='resources/img/file.svg'" alt= "fichier"/> `;
             var downloadEl = ` <img onclick = "download(event,this)" title = "Télécharger" src = "resources/img/download.svg" data-filename = "${item.filename}" /> `;
             if (item.isDir) {

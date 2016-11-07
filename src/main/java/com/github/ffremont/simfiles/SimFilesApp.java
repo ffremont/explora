@@ -15,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -26,16 +25,18 @@ import java.util.logging.Level;
 import java.util.stream.Stream;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.http.Part;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Redirect;
 import spark.Request;
+import static spark.Spark.after;
 import static spark.Spark.before;
 import static spark.Spark.delete;
 import static spark.Spark.exception;
 import static spark.Spark.get;
 import static spark.Spark.halt;
+import static spark.Spark.head;
 import static spark.Spark.port;
 import static spark.Spark.post;
 
@@ -218,6 +219,22 @@ public class SimFilesApp {
 
             return "";
         });
+        head("/file", (request, response) -> {
+            MyContext myContext = MyContext.get(request);
+            if (Files.notExists(myContext.path)) {
+                halt(404);
+            }
+            if (Files.isDirectory(myContext.path)) {
+                halt(405);
+            }
+            
+            response.header("x-checksum", DigestUtils.md5Hex(Files.newInputStream(myContext.path)));
+            response.header("x-last-modified", String.valueOf(Files.getLastModifiedTime(myContext.path).toMillis()));
+            response.header("Content-Type", Files.probeContentType(myContext.path));
+            response.header("Content-Length", String.valueOf(Files.size(myContext.path)));
+            
+            return "";
+        });
         get("/file", (request, response) -> {
             MyContext myContext = MyContext.get(request);
             if (Files.notExists(myContext.path)) {
@@ -227,21 +244,15 @@ public class SimFilesApp {
                 halt(405);
             }
 
+            response.header("x-checksum", DigestUtils.md5Hex(Files.newInputStream(myContext.path)));
+            response.header("x-last-modified", String.valueOf(Files.getLastModifiedTime(myContext.path).toMillis()));
+            
             response.header("Content-Type", Files.probeContentType(myContext.path));
-            response.header("Content-Disposition", "attachment; filename=" + myContext.path.toFile().getName());
-
-            return Files.newInputStream(myContext.path);
-        });
-        get("/file/view", (request, response) -> {
-            MyContext myContext = MyContext.get(request);
-            if (Files.notExists(myContext.path)) {
-                halt(404);
+            response.header("Content-Length", String.valueOf(Files.size(myContext.path)));
+            
+            if(request.queryParams("download") != null){
+                response.header("Content-Disposition", "attachment; filename=" + myContext.path.toFile().getName());
             }
-            if (Files.isDirectory(myContext.path)) {
-                halt(405);
-            }
-
-            response.header("Content-Type", Files.probeContentType(myContext.path));
 
             return Files.newInputStream(myContext.path);
         });
@@ -271,7 +282,15 @@ public class SimFilesApp {
                 } catch (IOException ex) {
                     LOGGER.error("impossible de connaître la date de modification du fichier {}", p.toAbsolutePath());
                 }
-
+                
+                if(p.toFile().isFile()){
+                    try {
+                        file.setChecksum(DigestUtils.md5Hex(Files.newInputStream(p)));
+                    } catch (IOException ex) {
+                        LOGGER.error("impossible de connaître le checksum du fichier {}", p.toAbsolutePath());
+                    }
+                }
+                
                 files.add(file);
             });
 
@@ -298,6 +317,9 @@ public class SimFilesApp {
 
             return "";
         });
+        after("/*", (request, response) -> {
+            response.header("Server", "Jetty");
+       });
     }
 
     private static class MyContext {
