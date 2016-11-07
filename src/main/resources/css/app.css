@@ -316,6 +316,7 @@ responsive
 }
 
 #dnd-files {
+    overflow-y: overlay;
     width: 500px;
     height: 400px;
 }
@@ -344,4 +345,34 @@ responsive
     height: 30px;
     margin: 0;
     background: rgba(128, 128, 128, 0.09);
+}
+
+#uploading-mask{
+    display:none;
+    background: black;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    opacity:0.5;
+    left: 0;
+    right: 0;
+    margin:0;
+    z-index: 9999999;
+}
+#uploading{
+    display:none;
+    position: fixed;
+    top: 30%;
+    left: 0;
+    right: 0;
+    width: 237px;
+    background: white;
+    z-index: 99999999;
+    text-align: center;
+    border-radius: 10px;
+    font-size: 140%;
+    font-weight: bold;
+}
+body.uploading #uploading-mask,body.uploading #uploading{
+    display:block
 }

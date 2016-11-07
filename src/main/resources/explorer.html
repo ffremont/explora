@@ -7,6 +7,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+        <link rel="stylesheet" href="resources/css/bar.css">
         <link rel="stylesheet" href="resources/css/jsmodal-light.css">
         <link rel="stylesheet" href="resources/css/meter.css">
         <link rel="stylesheet" href="resources/css/picnic.min.css">
@@ -34,6 +35,24 @@
 
         <div id="modal-add-folder"></div>
 
+        
+        <div id="uploading-mask"></div>
+        <div id="uploading">
+            <div id="uploading-gauge">
+              <div id="floatBarsG">
+                    <div id="floatBarsG_1" class="floatBarsG"></div>
+                    <div id="floatBarsG_2" class="floatBarsG"></div>
+                    <div id="floatBarsG_3" class="floatBarsG"></div>
+                    <div id="floatBarsG_4" class="floatBarsG"></div>
+                    <div id="floatBarsG_5" class="floatBarsG"></div>
+                    <div id="floatBarsG_6" class="floatBarsG"></div>
+                    <div id="floatBarsG_7" class="floatBarsG"></div>
+                    <div id="floatBarsG_8" class="floatBarsG"></div>
+                </div>
+            </div>
+            <span id="uploading-value">21%</span>
+        </div>
+        
         <div>
             <div id="add-mask" class="hide" onclick="toggleAdd(event)"></div>
             <div class="adds ">

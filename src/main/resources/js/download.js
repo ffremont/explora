@@ -59,16 +59,30 @@
                 alert('Echec de la création du répertoire.');
             });
     };
+    window.totaluploadprogress = function(totalPercentage){
+        var bodyEl = document.querySelector('body');
+        if(bodyEl.className.indexOf('uploading') === -1){
+            bodyEl.className = bodyEl.className+' uploading';
+        }
+        
+        var lblEl = document.getElementById('uploading-value');
+        if(totalPercentage >= 100){
+            lblEl.innerText = "100%";
+            bodyEl.className = bodyEl.className.replace(' uploading', '');
+        }else{
+            lblEl.innerText = parseFloat(totalPercentage).toFixed(1)+"%";
+        }
+    };
     window.addFile = function (event) {
         window.toggleAdd(event);
         Modal.open({
-            hideclose: false,
+            hideclose: true,
             content: `
                     <form id="dnd-files" action="/files" class="dropzone">
                         
                     </form>
                 `,
-            draggable: true,
+            draggable: false,
             closeCallback: function(){
                 window.refresh();
             }
@@ -81,14 +95,15 @@
             headers : {
                 Authorization: 'Basic ' + btoa(window.user + ':' + window.password)
             },
-            complete: function(){
-                Modal.close();
-            }
+            uploadMultiple: true,
+            totaluploadprogress : window.totaluploadprogress
         });
+        
     };
     window.addFolder = function (event) {
         window.toggleAdd(event);
         Modal.open({
+            hideOverlay:false,
             content: `
                     <h2>Créer un dossier</h2>
                     
@@ -98,7 +113,7 @@
                         <button type="submit" class="success">Créer</button> <button type="button" onclick="Modal.close()">Annuler</button>
                     </form>
                 `,
-            draggable: true
+            draggable: false
         });
     };
     window.goto = function (event, path) {
@@ -184,7 +199,7 @@
             var cls = '';
             var btnVoir = `<img src = "resources/img/view.svg" title = "Consulter le fichier" onclick = "voir(event,this)" data-filename = "${item.filename}" />`;
             var icon = ` <img src = "resources/img/${extension}.svg" onerror="this.src='resources/img/file.svg'" alt= "fichier"/> `;
-            var downloadEl = ` <img onclick = "download(this)" title = "Télécharger" src = "resources/img/download.svg" data-filename = "${item.filename}" /> `;
+            var downloadEl = ` <img onclick = "download(event,this)" title = "Télécharger" src = "resources/img/download.svg" data-filename = "${item.filename}" /> `;
             if (item.isDir) {
                 icon = ` <img src = "resources/img/folder-5.svg" alt = "fichier" /> `;
                 downloadEl = '';
@@ -231,7 +246,9 @@
             // barre d'info sur l'espace disque
                 var gaugeEl = document.getElementById('space-gauge');
                 var gaugeSpanEl = document.querySelector('#space-gauge span');
-                gaugeEl.title = `Espace occupé à ${data.ratioSpace} %`;
+                var usedGo = parseFloat((data.totalSpace - data.freeSpace) / (1024*1024*1024)).toFixed(3);
+                var totalSpaceGo = parseFloat((data.totalSpace) / (1024*1024*1024)).toFixed(3);
+                gaugeEl.title = `Espace occupé à ${data.ratioSpace} %, soit ${usedGo} Go sur ${totalSpaceGo} Go`;
                 gaugeSpanEl.className = 'blue';
                 if((data.ratioSpace > 75) && (data.ratioSpace < 92)){
                     gaugeSpanEl.className = 'yellow';

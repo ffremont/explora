@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import java.util.stream.Stream;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.http.Part;
 import org.eclipse.jetty.util.MultiPartInputStreamParser;
@@ -71,9 +72,10 @@ public class SimFilesApp {
                         sorted((a, b) -> b.compareTo(a)). // reverse; files before dirs
                         forEach(p -> {
                             try {
-                                Files.delete(p);
+                                Files.deleteIfExists(p);
                             } catch (IOException e) {
-                                /* ... */ }
+                                LOGGER.warn("impossible de supprimer le fichier temporaire", e);
+                            }
                         });
             }
         } catch (IOException ex) {
@@ -87,16 +89,16 @@ public class SimFilesApp {
             System.out.print(scanner.useDelimiter("\\A").next());
             System.out.println("\n\n");
         }
-        
+
         String confFile = System.getProperty("conf");
-        if(confFile == null){
+        if (confFile == null) {
             USERS = Arrays.asList(User.getDefault());
-        }else{
+        } else {
             LOGGER.info("Chargement du fichier de configuration {}", confFile);
             byte[] jsonB = Files.readAllBytes(Paths.get(confFile));
             USERS = Arrays.asList(gson.fromJson(new String(jsonB, StandardCharsets.UTF_8), User[].class));
         }
-        
+
         final int port = System.getProperty("port") == null ? 4567 : Integer.valueOf(System.getProperty("port"));
         LOGGER.info("Démarrage du serveur sur le port {}", port);
         port(port);
@@ -155,12 +157,12 @@ public class SimFilesApp {
                 LOGGER.debug(("Nom de répertoire invalide"));
                 halt(400);
             }
-            
+
             Path dir = Paths.get(myContext.path.toAbsolutePath().toString(), folderName);
             if (!dir.toAbsolutePath().toString().startsWith(myContext.user.getDirectory())) {
                 halt(403);
             }
-            
+
             if (Files.exists(dir)) {
                 halt(204);
             } else if (!Files.exists(dir.getParent())) {
@@ -183,26 +185,35 @@ public class SimFilesApp {
             long maxFileSize = 100000000;  // the maximum size allowed for uploaded files
             long maxRequestSize = 100000000;  // the maximum size allowed for multipart/form-data requests
             int fileSizeThreshold = 10240;  // the size threshold after which files will be written to disk
-            MultipartConfigElement multipartConfigElement = new MultipartConfigElement(myContext.path.toAbsolutePath().toString(), maxFileSize, maxRequestSize, fileSizeThreshold);
+            Path tmpFolder = Files.createTempDirectory("simfiles_");
+            MultipartConfigElement multipartConfigElement = new MultipartConfigElement(tmpFolder.toAbsolutePath().toString(), maxFileSize, maxRequestSize, fileSizeThreshold);
             request.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
 
             Collection<Part> parts = request.raw().getParts();
-            for (Part part : parts) {
-                if (Files.exists(Paths.get(myContext.path.toAbsolutePath().toString(), part.getSubmittedFileName()))) {
-                    halt(409);
-                }
+            try {
+                for (Part part : parts) {
+                    try {
+                        if (Files.exists(Paths.get(myContext.path.toAbsolutePath().toString(), part.getSubmittedFileName()))) {
+                            halt(409);
+                        }
 
-                FileOutputStream fos = new FileOutputStream(Paths.get(myContext.path.toAbsolutePath().toString(), part.getSubmittedFileName()).toFile());
-                try (InputStream is = part.getInputStream()) {
-                    byte[] buffer = new byte[10240]; // 10ko
-                    int read;
-                    while (-1 != (read = is.read(buffer))) {
-                        fos.write(buffer, 0, read);
+                        FileOutputStream fos = new FileOutputStream(Paths.get(myContext.path.toAbsolutePath().toString(), part.getSubmittedFileName()).toFile());
+                        try (InputStream is = part.getInputStream()) {
+                            byte[] buffer = new byte[10240]; // 10ko
+                            int read;
+                            while (-1 != (read = is.read(buffer))) {
+                                fos.write(buffer, 0, read);
+                            }
+                            fos.flush();
+                        }
+
+                    } finally {
+                        part.delete();
                     }
-                    fos.flush();
                 }
-
-                part.delete();
+            } finally {
+                clear(tmpFolder);
+                Files.deleteIfExists(tmpFolder);
             }
 
             return "";
@@ -238,34 +249,31 @@ public class SimFilesApp {
             MyContext myContext = MyContext.get(request);
 
             List<SimFile> files = new ArrayList<>();
-            Files.list(myContext.path).
-                    sorted((a, b)
-                            -> {
-                        if (a.toAbsolutePath().toAbsolutePath().toString().equals(b.toAbsolutePath().toString())) {
-                            return 0;
-                        } else if (a.toFile().isDirectory() && b.toFile().isFile()) {
-                            return -1;
-                        } else {
-                            return 1;
-                        }
-                    }). // reverse; files before dirs
-                    forEach((Path p) -> {
-                        String filename = p.getFileName().toString();
-                        SimFile file = new SimFile(filename, !p.toFile().isFile());
-                        try {
-                            file.setSize(Files.size(p));
-                        } catch (IOException ex) {
-                            LOGGER.error("impossible de connaître la taille du fichier {}", p.toAbsolutePath());
-                        }
-                        try {
-                            FileTime lastMod = Files.getLastModifiedTime(p);
-                            file.setModified(lastMod.to(TimeUnit.SECONDS));
-                        } catch (IOException ex) {
-                            LOGGER.error("impossible de connaître la date de modification du fichier {}", p.toAbsolutePath());
-                        }
 
-                        files.add(file);
-                    });
+            Stream.concat(
+                    Files.list(myContext.path)
+                    .filter((Path p) -> p.toFile().isDirectory())
+                    .sorted(),
+                    Files.list(myContext.path)
+                    .filter((Path p) -> !p.toFile().isDirectory())
+                    .sorted()
+            ).forEach((Path p) -> {
+                String filename = p.getFileName().toString();
+                SimFile file = new SimFile(filename, !p.toFile().isFile());
+                try {
+                    file.setSize(Files.size(p));
+                } catch (IOException ex) {
+                    LOGGER.error("impossible de connaître la taille du fichier {}", p.toAbsolutePath());
+                }
+                try {
+                    FileTime lastMod = Files.getLastModifiedTime(p);
+                    file.setModified(lastMod.to(TimeUnit.SECONDS));
+                } catch (IOException ex) {
+                    LOGGER.error("impossible de connaître la date de modification du fichier {}", p.toAbsolutePath());
+                }
+
+                files.add(file);
+            });
 
             return new SimFolder(myContext.path.toAbsolutePath().toString(), myContext.path.toFile().getFreeSpace(), myContext.path.toFile().getTotalSpace(), files);
         }, new JsonTransformer());
@@ -310,7 +318,7 @@ public class SimFilesApp {
             if (!dir.toAbsolutePath().toString().startsWith(user.getDirectory())) {
                 halt(403);
             }
-            
+
             return new MyContext(user, dir);
         }
     }
